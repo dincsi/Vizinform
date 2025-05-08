@@ -2,20 +2,26 @@
 #include <MD_Parola.h>
 #include <MD_MAX72xx.h>
 #include <SPI.h>
-#include "hun.h"
+#include "hun.h"    // Hungarian font library
 #include <EEPROM.h> // EEPROM könyvtár hozzáadása
 
 // Uncomment according to your hardware type
 #define HARDWARE_TYPE MD_MAX72XX::FC16_HW
 #define MAX_DEVICES 8
-#define CS_PIN 3
+
+// Lábkiosztás ARDUINO_AVR_UNO
+// DIN - Data In / MOSI (11)
+// CLK - Clock / SCL (13)
+// CS - Chip Select / PMW (3)
+
+#define CS_PIN 3 // Chip Select láb (PMW)
 
 // EEPROM cím és maximális szöveghossz definíciója
 #define EEPROM_ADDR_START 0
-#define MAX_TEXT_LENGTH 50 // Maximális szöveghossz az EEPROM-ban (állítsd be szükség szerint)
+#define MAX_TEXT_LENGTH 128 // Maximális szöveghossz az EEPROM-ban
 
 MD_Parola myDisplay = MD_Parola(HARDWARE_TYPE, CS_PIN, MAX_DEVICES);
-String textToDisplay = "FOK-GYEM Vizinform ;)"; // Alapértelmezett szöveg
+String textToDisplay = "- - - Bragotron - Vizinform - - -"; // Alapértelmezett szöveg - ékezetes betűket \xHH alakban kell megadni
 
 // --- EEPROM segédfüggvények ---
 // String írása az EEPROM-ba
