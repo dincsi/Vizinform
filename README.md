@@ -1,4 +1,6 @@
-# FOK-GYEM Vizinform-szerű kijelző
+# Bragotron - Vizinform kijelző
+Ardiuino // MAV7219 8x8 LED mártix alapú kijelző.
+
 ## Arduino kezelőszoftver
 ### Használat
 Csatlakoztasd a kijelzőt egy számítógéphez és küld rá soros porton keresztül a megjeleníteni kívánt szöveget latin2 kódolással. Használhatod PlatformIO monitor funkcióját, majd:
