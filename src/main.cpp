@@ -2,19 +2,25 @@
 #include <MD_Parola.h>
 #include <MD_MAX72xx.h>
 #include <SPI.h>
-#include "hun.h"    // Hungarian font library
-#include <EEPROM.h> // EEPROM könyvtár hozzáadása
+#include "hun.h"            // Hungarian font library
+#include <EEPROM.h>         // EEPROM könyvtár hozzáadása
+#include <SoftwareSerial.h> // SoftwareSerial könyvtár hozzáadása
 
 // Uncomment according to your hardware type
 #define HARDWARE_TYPE MD_MAX72XX::FC16_HW
-#define MAX_DEVICES 8
+#define MAX_DEVICES 12
 
 // Lábkiosztás ARDUINO_AVR_UNO
 // DIN - Data In / MOSI (11)
 // CLK - Clock / SCL (13)
 // CS - Chip Select / PMW (3)
+// Softwareserial TX (4) RX (5)
 
 #define CS_PIN 3 // Chip Select láb (PMW)
+#define RX_PIN 4 // Softwareserial RX láb
+#define TX_PIN 5 // Softwareserial TX láb
+
+SoftwareSerial bluetoothSerial(RX_PIN, TX_PIN); // Softwareserial objektum létrehozása
 
 // EEPROM cím és maximális szöveghossz definíciója
 #define EEPROM_ADDR_START 0
@@ -67,7 +73,9 @@ String readStringFromEEPROM(int addrOffset)
 
 void setup()
 {
-  Serial.begin(9600); // Fontos a megfelelő baud rate beállítása
+  Serial.begin(9600);          // Fontos a megfelelő baud rate beállítása
+  bluetoothSerial.begin(9600); // Bluetooth baud rate beállítása
+  Serial.println("Bluetooth inicializalva.");
 
   // EEPROM inicializálása (ESP32/ESP8266 esetén szükséges lehet a méret megadásával)
   // EEPROM.begin(MAX_TEXT_LENGTH + 2); // Méret = max hossz + hossz bájt + null terminátor
@@ -103,8 +111,10 @@ void loop()
   // Belovasunk a soros poortról egy sort \n-ig és kcseréljük a szöveget
   if (Serial.available() > 0)
   {
-    String inputText = Serial.readStringUntil('\n');
-    inputText.trim(); // Eltávolítjuk a felesleges szóközöket/sortöréseket
+    // String inputText = Serial.readStringUntil('\n');
+
+    String inputText = bluetoothSerial.readString(); // Bluetooth bemenet olvasása
+    inputText.trim();                                         // Eltávolítjuk a felesleges szóközöket/sortöréseket
 
     // Csak akkor frissítünk és mentünk, ha a szöveg változott, nem üres és belefér
     if (inputText.length() > 0 && inputText != textToDisplay && inputText.length() <= MAX_TEXT_LENGTH)
