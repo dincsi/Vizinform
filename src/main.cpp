@@ -75,6 +75,70 @@ void setup()
 {
   Serial.begin(9600);          // Fontos a megfelelő baud rate beállítása
   bluetoothSerial.begin(9600); // Bluetooth baud rate beállítása
+
+  Serial.println("=== HC-05 Bluetooth inicializalasa ===");
+
+  // Várakozás a modul inicializálására
+  delay(2000);
+
+  // HC-05 név beállítása AT parancsokkal
+  Serial.println("HC-05 nev beallitasa...");
+
+  // 1. AT mód ellenőrzése
+  Serial.println("AT mod ellenorzese...");
+  bluetoothSerial.print("AT");
+  delay(1000);
+
+  if (bluetoothSerial.available())
+  {
+    String response = bluetoothSerial.readString();
+    response.trim();
+    Serial.println("AT valasz: " + response);
+
+    if (response == "OK")
+    {
+      Serial.println("AT mod OK - nev beallitasa...");
+
+      // 2. Név beállítása
+      bluetoothSerial.print("AT+NAME=Bragotron");
+      delay(1000);
+
+      if (bluetoothSerial.available())
+      {
+        String nameResponse = bluetoothSerial.readString();
+        nameResponse.trim();
+        Serial.println("Nev beallitas valasz: " + nameResponse);
+
+        if (nameResponse == "OK")
+        {
+          Serial.println("SIKER: Bluetooth nev beallitva - Bragotron");
+        }
+      }
+
+      // 3. Ellenőrzés - név lekérdezése
+      bluetoothSerial.print("AT+NAME?");
+      delay(1000);
+      if (bluetoothSerial.available())
+      {
+        String currentName = bluetoothSerial.readString();
+        Serial.println("Jelenlegi nev: " + currentName);
+      }
+    }
+    else
+    {
+      Serial.println("HIBA: AT mod nem elerheto!");
+      Serial.println("Ellenorizd:");
+      Serial.println("1. EN/KEY pin csatlakoztatva van a VCC-hez?");
+      Serial.println("2. HC-05 LED lassan villog (2mp-enkent)?");
+      Serial.println("3. Modul nincs parosítva mas eszkozzel?");
+    }
+  }
+  else
+  {
+    Serial.println("HIBA: Nincs valasz a HC-05 modultol!");
+    Serial.println("Ellenorizd a kabelezest es az AT modot!");
+  }
+
   Serial.println("Bluetooth inicializalva.");
 
   // EEPROM inicializálása (ESP32/ESP8266 esetén szükséges lehet a méret megadásával)
@@ -109,12 +173,12 @@ void setup()
 void loop()
 {
   // Belovasunk a soros poortról egy sort \n-ig és kcseréljük a szöveget
-  if (Serial.available() > 0)
+  if (bluetoothSerial.available() > 0)
   {
     // String inputText = Serial.readStringUntil('\n');
 
     String inputText = bluetoothSerial.readString(); // Bluetooth bemenet olvasása
-    inputText.trim();                                         // Eltávolítjuk a felesleges szóközöket/sortöréseket
+    inputText.trim();                                // Eltávolítjuk a felesleges szóközöket/sortöréseket
 
     // Csak akkor frissítünk és mentünk, ha a szöveg változott, nem üres és belefér
     if (inputText.length() > 0 && inputText != textToDisplay && inputText.length() <= MAX_TEXT_LENGTH)
