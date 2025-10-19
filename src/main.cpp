@@ -17,8 +17,8 @@
 // Softwareserial TX (4) RX (5)
 
 #define CS_PIN 3 // Chip Select láb (PMW)
-#define RX_PIN 4 // Softwareserial RX láb
-#define TX_PIN 5 // Softwareserial TX láb
+#define RX_PIN 8 // Softwareserial RX láb
+#define TX_PIN 9 // Softwareserial TX láb
 
 SoftwareSerial bluetoothSerial(RX_PIN, TX_PIN); // Softwareserial objektum létrehozása
 
@@ -26,55 +26,28 @@ SoftwareSerial bluetoothSerial(RX_PIN, TX_PIN); // Softwareserial objektum létr
 #define EEPROM_ADDR_START 0
 #define MAX_TEXT_LENGTH 128 // Maximális szöveghossz az EEPROM-ban
 
+#include "EEPROMHelper.h"
+
+// EEPROM helper példány
+EEPROMHelper eeprom(EEPROM_ADDR_START, MAX_TEXT_LENGTH);
+
+#include "Clock.h"
+
+// Simple software clock instance
+Clock clock;
+bool clockMode = false;
+unsigned long lastClockDisplayMillis = 0;
+String clockText = "00:00:00"; // persistent clock text shown on the display
+
 MD_Parola myDisplay = MD_Parola(HARDWARE_TYPE, CS_PIN, MAX_DEVICES);
 String textToDisplay = "- - - Bragotron - Vizinform - - -"; // Alapértelmezett szöveg - ékezetes betűket \xHH alakban kell megadni
 
-// --- EEPROM segédfüggvények ---
-// String írása az EEPROM-ba
-void writeStringToEEPROM(int addrOffset, const String &strToWrite)
-{
-  byte len = strToWrite.length();
-  if (len > MAX_TEXT_LENGTH)
-  { // Ellenőrizzük, hogy belefér-e
-    len = MAX_TEXT_LENGTH;
-  }
-  EEPROM.write(addrOffset, len); // Elmentjük a hosszt az első bájtba
-  for (int i = 0; i < len; i++)
-  {
-    EEPROM.write(addrOffset + 1 + i, strToWrite[i]);
-  }
-  // Lezáró nulla karakter (nem feltétlenül szükséges, ha a hosszt tároljuk, de jó gyakorlat)
-  EEPROM.write(addrOffset + 1 + len, '\0');
-
-  // EEPROM írás véglegesítése (ESP32/ESP8266 esetén szükséges lehet)
-  // if (!EEPROM.commit()) {
-  //   Serial.println("Hiba az EEPROM írásakor!");
-  // }
-}
-
-// String olvasása az EEPROM-ból
-String readStringFromEEPROM(int addrOffset)
-{
-  int newStrLen = EEPROM.read(addrOffset);
-  // Ellenőrizzük, hogy a hossz érvényes-e (nem 0xFF és nem nagyobb a maximumnál)
-  if (newStrLen == 0xFF || newStrLen == 0 || newStrLen > MAX_TEXT_LENGTH)
-  {
-    return ""; // Üres string, ha nincs érvényes adat
-  }
-  char data[newStrLen + 1]; // Buffer a karaktereknek + null terminátor
-  for (int i = 0; i < newStrLen; i++)
-  {
-    data[i] = EEPROM.read(addrOffset + 1 + i);
-  }
-  data[newStrLen] = '\0'; // Null terminátor hozzáadása
-  return String(data);
-}
-// --- EEPROM segédfüggvények vége ---
+// EEPROM kezelést most az EEPROMHelper osztály végzi
 
 void setup()
 {
-  Serial.begin(9600);          // Fontos a megfelelő baud rate beállítása
-  bluetoothSerial.begin(9600); // Bluetooth baud rate beállítása
+  Serial.begin(9600);           // Fontos a megfelelő baud rate beállítása
+  bluetoothSerial.begin(38400); // Bluetooth baud rate beállítása
 
   Serial.println("=== HC-05 Bluetooth inicializalasa ===");
 
@@ -145,7 +118,7 @@ void setup()
   // EEPROM.begin(MAX_TEXT_LENGTH + 2); // Méret = max hossz + hossz bájt + null terminátor
 
   // Szöveg betöltése az EEPROM-ból
-  String savedText = readStringFromEEPROM(EEPROM_ADDR_START);
+  String savedText = eeprom.readString(EEPROM_ADDR_START);
   if (savedText.length() > 0)
   {
     textToDisplay = savedText;
@@ -161,7 +134,7 @@ void setup()
   // Initialize the object
   myDisplay.begin();
   // Set the brightness of the display (0-15)
-  myDisplay.setIntensity(0);
+  myDisplay.setIntensity(0); // increase from 0 (very dim) to visible
   myDisplay.setFont(hun);
   // Clear the display
   myDisplay.displayClear();
@@ -180,22 +153,72 @@ void loop()
     String inputText = bluetoothSerial.readString(); // Bluetooth bemenet olvasása
     inputText.trim();                                // Eltávolítjuk a felesleges szóközöket/sortöréseket
 
-    // Csak akkor frissítünk és mentünk, ha a szöveg változott, nem üres és belefér
-    if (inputText.length() > 0 && inputText != textToDisplay && inputText.length() <= MAX_TEXT_LENGTH)
+    // ha a szöveg paranccsal (@set) kezdődik
+    if (inputText.startsWith("@set"))
     {
-      textToDisplay = inputText;
-      Serial.println("Szoveg frissitve: " + textToDisplay); // println használata
+      // megnézzük az utána következő részt és ha
+      // - clock akkor beállítjuk az órát a megadott időre és óra üzemmódba kapcsolunk
+      // - text akkor normál szöveg módba kapcsolunk és a megadott szöveget jelenítjük meg
+      if (inputText.startsWith("@set clock"))
+      {
+        // Expected format: "@set clock hh:mm:ss"
+        int prefixLen = 11; // length of "@set clock"
+        String rest = "";
+        if (inputText.length() > prefixLen)
+        {
+          rest = inputText.substring(prefixLen);
+        }
+        rest.trim();
+        if (rest.length() >= 8)
+        {
+          int hh = rest.substring(0, 2).toInt();
+          int mm = rest.substring(3, 5).toInt();
+          int ss = rest.substring(6, 8).toInt();
+          clock.setTime((uint8_t)hh, (uint8_t)mm, (uint8_t)ss);
+          clockMode = true;
+          Serial.print("Ora beallitva: ");
+          Serial.println(clock.getTime());
+          // Update persistent text and show on display
+          clockText = clock.getTime();
+          myDisplay.displayClear();
+          myDisplay.displayReset();
+          myDisplay.displayText(clockText.c_str(), PA_CENTER, 100, 0, PA_PRINT);
+        }
+        else
+        {
+          Serial.println("Hiba: id formatuma: hh:mm:ss (pl. @set clock 14:30:00)");
+        }
+      }
+      else if (inputText.startsWith("@set text"))
+      {
+        // Szöveg mód beállítása
+        String newText = inputText.substring(9); // "@set text " hosszúságú rész levágása
+        newText.trim();
+        if (newText.length() > 0 && inputText != textToDisplay && newText.length() <= MAX_TEXT_LENGTH)
+        {
+          textToDisplay = newText;
+          Serial.println("Szoveg mod beallitva: " + textToDisplay);
 
-      // Új szöveg mentése az EEPROM-ba
-      writeStringToEEPROM(EEPROM_ADDR_START, textToDisplay);
-      Serial.println("Szoveg elmentve az EEPROM-ba.");
+          // Új szöveg mentése az EEPROM-ba
+          eeprom.writeString(EEPROM_ADDR_START, textToDisplay);
+          Serial.println("Szoveg elmentve az EEPROM-ba.");
 
-      // Kijelző frissítése az új szöveggel
-      myDisplay.displayText(textToDisplay.c_str(), PA_CENTER, 100, 0, PA_SCROLL_LEFT, PA_SCROLL_LEFT);
-    }
-    else if (inputText.length() > MAX_TEXT_LENGTH)
-    {
-      Serial.println("Hiba: A szoveg tul hosszu az EEPROM menteshez!");
+          // Kijelző frissítése az új szöveggel
+          // myDisplay.displayText(textToDisplay.c_str(), PA_CENTER, 100, 0, PA_SCROLL_LEFT, PA_SCROLL_LEFT);
+          clockMode = false; // Kilépünk az óra módból, ha szöveget állítunk be
+          myDisplay.displayClear();
+          myDisplay.displayReset();
+          myDisplay.displayText(textToDisplay.c_str(), PA_CENTER, 100, 0, PA_SCROLL_LEFT, PA_SCROLL_LEFT);
+        }
+        else
+        {
+          Serial.println("Hiba: A szoveg tul hosszu vagy ures az EEPROM menteshez!");
+        }
+      }
+      else
+      {
+        Serial.println("Hiba: Ismeretlen @set parancs!");
+      }
     }
   }
 
@@ -203,5 +226,24 @@ void loop()
   if (myDisplay.displayAnimate())
   {
     myDisplay.displayReset(); // Animáció végén reset (ha szükséges)
+  }
+
+  // Clock update and display (if enabled)
+  clock.update();
+  if (clockMode)
+  {
+    // Update display once per second
+    if (millis() - lastClockDisplayMillis >= 1000UL)
+    {
+      lastClockDisplayMillis = millis();
+      clock.update();
+      String t = clock.getTime();
+      Serial.println(t);
+      if (t != clockText)
+      {
+        clockText = t;
+        myDisplay.displayText(clockText.c_str(), PA_CENTER, 100, 0, PA_PRINT);
+      }
+    }
   }
 }
