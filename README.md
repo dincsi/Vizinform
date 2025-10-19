@@ -27,3 +27,42 @@ Használhatsz tetszőleges bluetooth terminal programot, ami képes latin2 kódo
 ### Magyar betűtípus
 - hun.h
 - [szerkesztés vagy új készítése](https://pjrp.github.io/MDParolaFontEditor)
+
+## Új funkciók
+
+### Óra mód
+A kijelző mostantól képes az aktuális időt HH:MM formátumban megjeleníteni. Az időt a következő parancs segítségével állíthatod be Bluetooth-on keresztül:
+
+```
+@set clock hh:mm:ss
+```
+
+Példa:
+```
+@set clock 14:30:00
+```
+Ezután a kijelzőn "14:30" jelenik meg, és percenként frissül.
+
+### Szöveg mód
+A szöveg mód lehetővé teszi egyedi szöveg megjelenítését. Használja a következő parancsot:
+
+```
+@set text szoveg
+```
+
+Példa:
+```
+@set text Hello, világ!
+```
+
+### EEPROM használata
+- Az utoljára beállított szöveg vagy óra mód mentésre kerül az EEPROM-ba, így újraindítás után automatikusan betöltődik.
+- Az EEPROM címzése és maximális szöveghossza konfigurálható a `EEPROM_ADDR_START` és `MAX_TEXT_LENGTH` konstansokkal.
+
+### Betűtípusok
+- Az óra mód fix szélességű betűtípust használ a pontos megjelenítés érdekében.
+- A szöveg mód a `hun.h` magyar ékezetes betűtípust használja.
+
+### Parancsok összefoglalása
+- `@set clock hh:mm:ss` - Óra mód beállítása.
+- `@set text szoveg` - Szöveg mód beállítása.
