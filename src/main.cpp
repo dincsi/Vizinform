@@ -37,7 +37,7 @@ EEPROMHelper eeprom(EEPROM_ADDR_START, MAX_TEXT_LENGTH);
 Clock clock;
 bool clockMode = false;
 unsigned long lastClockDisplayMillis = 0;
-String clockText = "00:00:00"; // persistent clock text shown on the display
+String clockText = "00:00"; // persistent clock text shown on the display (HH:MM)
 
 MD_Parola myDisplay = MD_Parola(HARDWARE_TYPE, CS_PIN, MAX_DEVICES);
 String textToDisplay = "- - - Bragotron - Vizinform - - -"; // Alapértelmezett szöveg - ékezetes betűket \xHH alakban kell megadni
@@ -178,8 +178,8 @@ void loop()
           clockMode = true;
           Serial.print("Ora beallitva: ");
           Serial.println(clock.getTime());
-          // Update persistent text and show on display
-          clockText = clock.getTime();
+          // Update persistent text (HH:MM only) and show on display
+          clockText = clock.getTime().substring(0, 5); // HH:MM
           myDisplay.displayClear();
           myDisplay.displayReset();
           myDisplay.displayText(clockText.c_str(), PA_CENTER, 100, 0, PA_PRINT);
@@ -238,10 +238,12 @@ void loop()
       lastClockDisplayMillis = millis();
       clock.update();
       String t = clock.getTime();
-      Serial.println(t);
-      if (t != clockText)
+      // Only show hours and minutes
+      String hhmm = t.substring(0, 5);
+      Serial.println(hhmm);
+      if (hhmm != clockText)
       {
-        clockText = t;
+        clockText = hhmm;
         myDisplay.displayText(clockText.c_str(), PA_CENTER, 100, 0, PA_PRINT);
       }
     }
